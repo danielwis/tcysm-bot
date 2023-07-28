@@ -1,25 +1,16 @@
+mod commands;
+mod meta;
+
 use poise::serenity_prelude as serenity;
-struct Data {}
+pub struct Data {}
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
-
-#[poise::command(slash_command)]
-async fn source(ctx: Context<'_>) -> Result<(), Error> {
-    ctx.say("https://github.com/danielwis/tcysm-bot").await?;
-    Ok(())
-}
-
-#[poise::command(prefix_command)]
-async fn register(ctx: Context<'_>) -> Result<(), Error> {
-    poise::builtins::register_application_commands_buttons(ctx).await?;
-    Ok(())
-}
 
 #[tokio::main]
 async fn main() {
     poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![source(), register()],
+            commands: vec![meta::source(), meta::register(), commands::authenticate()],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("!".into()),
                 ..Default::default()
