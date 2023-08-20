@@ -42,6 +42,26 @@ pub async fn authenticate(
     ctx: Context<'_>,
     #[description = "Your KTH ID"] kth_id: String,
 ) -> Result<(), Error> {
+    let author_id = ctx.author().id.0 as i64;
+    if let Some(auth_status) = sqlx::query!("SELECT status FROM auths WHERE user_id = ?", author_id)
+        .fetch_optional(&ctx.data().database)
+        .await?
+    {
+        match auth_status.status.as_str() {
+            "pending" => {
+                ctx.say("Authentication already initiated. Please check your e-mail").await?;
+            }
+            "authorised" => {
+                ctx.say("Already authorised").await?;
+            }
+            _ => {
+                ctx.say("What?").await?;
+            }
+        }
+        return Ok(());
+    }
+
+    // Discord user not already authenticated. TODO check kth ID too
     let response = reqwest::get(format!("https://hodis.datasektionen.se/uid/{kth_id}")).await;
     if let Err(_) = response {
         ctx.say("Failed to reach authentication service.").await?;
@@ -57,12 +77,24 @@ pub async fn authenticate(
 
     let email = student?.mail.clone();
 
-    if get_employee_uids().await?.contains(&kth_id) {
+    let role_to_assign = if get_employee_uids().await?.contains(&kth_id) {
         ctx.say(format!("Sending e-mail to {email} (teacher role)"))
             .await?;
+        String::from("Student")
     } else {
-        ctx.say(format!("Sending e-mail to {email} (student role)")).await?;
-    }
+        ctx.say(format!("Sending e-mail to {email} (student role)"))
+            .await?;
+        String::from("Teacher")
+    };
+
+    sqlx::query!(
+        "INSERT INTO auths(user_id, role, status) VALUES (?, ?, ?);",
+        author_id,
+        role_to_assign,
+        "pending"
+    )
+    .execute(&ctx.data().database)
+    .await?;
 
     Ok(())
 }

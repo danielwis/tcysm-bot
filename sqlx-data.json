@@ -1,0 +1,31 @@
+{
+  "db": "SQLite",
+  "10302b5b6df913e7cf83fb7f08d875483760804be8010566d097db32a5569f1d": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 3
+      }
+    },
+    "query": "INSERT INTO auths(user_id, role, status) VALUES (?, ?, ?);"
+  },
+  "7ab4c0e748772211a252e85cafda1fe0b1eb778b54e48e4339ed0cd7c5ad4399": {
+    "describe": {
+      "columns": [
+        {
+          "name": "status",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "SELECT status FROM auths WHERE user_id = ?"
+  }
+}
