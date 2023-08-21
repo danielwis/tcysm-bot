@@ -1,3 +1,4 @@
+use crate::checks::check_admin;
 use crate::{Context, Error};
 use reqwest;
 use scraper::{Html, Selector};
@@ -37,8 +38,41 @@ async fn get_employee_uids() -> Result<Vec<String>, Error> {
     return Ok(emp_ids);
 }
 
-#[poise::command(slash_command, prefix_command)]
-pub async fn authenticate(
+#[poise::command(slash_command, prefix_command, subcommands("id", "passphrase"))]
+pub async fn authenticate(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.say("Invalid use of parent command.").await?;
+    Ok(())
+}
+
+#[poise::command(slash_command, prefix_command, ephemeral = true)]
+pub async fn passphrase(
+    ctx: Context<'_>,
+    #[description = "The passphrase"] passphrase: String,
+) -> Result<(), Error> {
+    let existing_phrase = ctx.data().open_reg_phrase.lock().unwrap().clone();
+
+    if let Some(phrase) = existing_phrase {
+        if phrase == passphrase {
+            ctx.author_member()
+                .await
+                .unwrap()
+                .to_mut()
+                .add_role(&ctx.serenity_context().http, ctx.data().student_role_id)
+                .await?;
+
+            ctx.say("Successfully authenticated as student.").await?;
+        } else {
+            ctx.say("Incorrect passphrase. Please try again.").await?;
+        }
+    } else {
+        ctx.say("Passphrase authentication is not currently enabled. If you believe this to be a mistake, please contact a moderator.").await?;
+    }
+
+    Ok(())
+}
+
+#[poise::command(slash_command, prefix_command, ephemeral = true)]
+pub async fn id(
     ctx: Context<'_>,
     #[description = "Your KTH ID"] kth_id: String,
 ) -> Result<(), Error> {
@@ -49,7 +83,8 @@ pub async fn authenticate(
     {
         match auth_status.status.as_str() {
             "pending" => {
-                ctx.say("Authentication already initiated. Please check your e-mail").await?;
+                ctx.say("Authentication already initiated. Please check your e-mail")
+                    .await?;
             }
             "authorised" => {
                 ctx.say("Already authorised").await?;
@@ -61,7 +96,8 @@ pub async fn authenticate(
         return Ok(());
     }
 
-    // Discord user not already authenticated. TODO check kth ID too
+    // Discord user not already authenticated. TODO check kth ID too?
+    // TODO: Store passphrase too for verification lmao
     let response = reqwest::get(format!("https://hodis.datasektionen.se/uid/{kth_id}")).await;
     if let Err(_) = response {
         ctx.say("Failed to reach authentication service.").await?;
@@ -95,6 +131,65 @@ pub async fn authenticate(
     )
     .execute(&ctx.data().database)
     .await?;
+
+    Ok(())
+}
+
+#[poise::command(
+    prefix_command,
+    slash_command,
+    subcommands("open", "close", "check"),
+    check = "check_admin"
+)]
+pub async fn passreg(ctx: Context<'_>) -> Result<(), Error> {
+    ctx.say("Invalid use of parent command.").await?;
+    Ok(())
+}
+
+#[poise::command(slash_command, prefix_command, check = "check_admin", ephemeral = true)]
+pub async fn open(
+    ctx: Context<'_>,
+    #[description = "The passphrase to use for authentication"] phrase: String,
+) -> Result<(), Error> {
+    // Don't use `if let` to avoid holding lock across the `await` below.
+    let existing = ctx.data().open_reg_phrase.lock().unwrap().clone();
+    if let Some(existing_phrase) = existing {
+        ctx.say(format!("Registration already open with phrase {existing_phrase}. Close and re-open to change the phrase."))
+            .await?;
+    } else {
+        *ctx.data().open_reg_phrase.lock().unwrap() = Some(phrase.clone());
+        ctx.say(format!("Passphrase registration opened with '{phrase}'"))
+            .await?;
+    }
+
+    Ok(())
+}
+
+#[poise::command(slash_command, prefix_command, check = "check_admin", ephemeral = true)]
+pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
+    // Don't use `if let` to avoid holding lock across the `await` below.
+    let existing = ctx.data().open_reg_phrase.lock().unwrap().clone();
+    if let Some(existing_phrase) = existing {
+        ctx.say(format!(
+            "Closing open registration with '{existing_phrase}'."
+        ))
+        .await?;
+    }
+    *ctx.data().open_reg_phrase.lock().unwrap() = None;
+
+    Ok(())
+}
+
+#[poise::command(slash_command, prefix_command, check = "check_admin", ephemeral = true)]
+pub async fn check(ctx: Context<'_>) -> Result<(), Error> {
+    // Don't use `if let` to avoid holding lock across the `await` below.
+    let existing = ctx.data().open_reg_phrase.lock().unwrap().clone();
+    if let Some(existing_phrase) = existing {
+        ctx.say(format!("Registration open. Phrase: '{existing_phrase}'."))
+            .await?;
+    } else {
+        ctx.say("Closed.").await?;
+    }
 
     Ok(())
 }

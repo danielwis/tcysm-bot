@@ -1,11 +1,14 @@
 mod auth;
 mod checks;
 mod meta;
+use std::sync::Mutex;
 
 use poise::serenity_prelude as serenity;
 pub struct Data {
     database: sqlx::SqlitePool,
     admin_role_id: serenity::RoleId,
+    student_role_id: serenity::RoleId,
+    open_reg_phrase: Mutex<Option<String>>,
 }
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -27,13 +30,22 @@ async fn main() {
     sqlx::migrate!("./migrations").run(&database).await.unwrap();
 
     let admin_role_id = std::env::var("ADMIN_ROLE_ID")
-        .unwrap()
+        .expect("Unable to find admin role ID in environment variables")
+        .parse::<serenity::RoleId>()
+        .unwrap();
+    let student_role_id = std::env::var("STUDENT_ROLE_ID")
+        .expect("Unable to find student role ID in environment variables")
         .parse::<serenity::RoleId>()
         .unwrap();
 
     poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![meta::source(), meta::register(), auth::authenticate()],
+            commands: vec![
+                meta::source(),
+                meta::register(),
+                auth::authenticate(),
+                auth::passreg(),
+            ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("!".into()),
                 ..Default::default()
@@ -56,6 +68,8 @@ async fn main() {
                 Ok(Data {
                     database,
                     admin_role_id,
+                    student_role_id,
+                    open_reg_phrase: Mutex::new(None),
                 })
             })
         })
