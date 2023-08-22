@@ -50,9 +50,39 @@ pub async fn passphrase(
     #[description = "The passphrase"] passphrase: String,
 ) -> Result<(), Error> {
     let existing_phrase = ctx.data().open_reg_phrase.lock().unwrap().clone();
+    let author_id = ctx.author().id.0 as i64;
 
     if let Some(phrase) = existing_phrase {
         if phrase == passphrase {
+            // Users who are already authenticated don't need to re-auth
+            if let Some(auth_status) =
+                sqlx::query!("SELECT status FROM auths WHERE user_id = ?", author_id)
+                    .fetch_optional(&ctx.data().database)
+                    .await?
+            {
+                if auth_status.status == "authenticated" {
+                    ctx.say("Already authenticated.").await?;
+                    return Ok(());
+                }
+            }
+
+            // Add auth to DB
+            let now = std::time::SystemTime::now();
+            let db_time = humantime::format_rfc3339_seconds(now).to_string();
+            sqlx::query!(
+                "INSERT INTO auths(user_id, role, status, passphrase, auth_type, kth_id, authenticated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?);",
+                author_id,
+                "student",
+                "authenticated",
+                passphrase,
+                "passphrase",
+                None::<String>,
+                db_time
+            )
+            .execute(&ctx.data().database)
+            .await?;
+
             ctx.author_member()
                 .await
                 .unwrap()
@@ -86,7 +116,7 @@ pub async fn id(
                 ctx.say("Authentication already initiated. Please check your e-mail")
                     .await?;
             }
-            "authorised" => {
+            "authenticated" => {
                 ctx.say("Already authorised").await?;
             }
             _ => {
@@ -124,10 +154,14 @@ pub async fn id(
     };
 
     sqlx::query!(
-        "INSERT INTO auths(user_id, role, status) VALUES (?, ?, ?);",
+        "INSERT INTO auths(user_id, role, status, passphrase, auth_type, kth_id)
+            VALUES (?, ?, ?, ?, ?, ?);",
         author_id,
         role_to_assign,
-        "pending"
+        "pending",
+        "TODO",
+        "kth_id",
+        kth_id
     )
     .execute(&ctx.data().database)
     .await?;

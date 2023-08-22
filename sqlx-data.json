@@ -1,14 +1,24 @@
 {
   "db": "SQLite",
-  "10302b5b6df913e7cf83fb7f08d875483760804be8010566d097db32a5569f1d": {
+  "218110bdee315a13245ffd3314c808a33086171c4f9d457978041274ad5f0921": {
     "describe": {
       "columns": [],
       "nullable": [],
       "parameters": {
-        "Right": 3
+        "Right": 7
       }
     },
-    "query": "INSERT INTO auths(user_id, role, status) VALUES (?, ?, ?);"
+    "query": "INSERT INTO auths(user_id, role, status, passphrase, auth_type, kth_id, authenticated_at)\n                VALUES (?, ?, ?, ?, ?, ?, ?);"
+  },
+  "2951830c91334a34f64891bf16e35f2d998334eb80d953683abe20e94317601d": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 6
+      }
+    },
+    "query": "INSERT INTO auths(user_id, role, status, passphrase, auth_type, kth_id)\n            VALUES (?, ?, ?, ?, ?, ?);"
   },
   "7ab4c0e748772211a252e85cafda1fe0b1eb778b54e48e4339ed0cd7c5ad4399": {
     "describe": {
