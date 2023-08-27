@@ -1,15 +1,5 @@
 {
   "db": "SQLite",
-  "06720e763ca119f8273e1a88b314e8debe9c5d5a54bf5082ce0c15db02596b24": {
-    "describe": {
-      "columns": [],
-      "nullable": [],
-      "parameters": {
-        "Right": 7
-      }
-    },
-    "query": "INSERT INTO auths(user_id, role, status, passphrase, auth_type, kth_id, authenticated_at)\n        VALUES (?, ?, ?, ?, ?, ?, ?);"
-  },
   "0beeaa5ccd2846df5f8a3c5d8fc23286f3b51ec75df2c96c639c6d17f286fe08": {
     "describe": {
       "columns": [
@@ -93,5 +83,15 @@
       }
     },
     "query": "DELETE FROM linked_roles WHERE passphrase = ? AND role = ?;"
+  },
+  "efbe6a9a0e55d8d16fa7331108bfb1a3673b83526c0a6b12eed15d2e243ef5db": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 7
+      }
+    },
+    "query": "INSERT OR IGNORE INTO auths(user_id, role, status, passphrase, auth_type, kth_id, authenticated_at)\n        VALUES (?, ?, ?, ?, ?, ?, ?);"
   }
 }
