@@ -44,7 +44,7 @@ pub async fn authenticate(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-#[poise::command(slash_command, prefix_command, ephemeral = true)]
+#[poise::command(slash_command, prefix_command, ephemeral = true, guild_only)]
 pub async fn passphrase(
     ctx: Context<'_>,
     #[description = "The passphrase"] passphrase: String,
@@ -101,7 +101,7 @@ pub async fn passphrase(
     Ok(())
 }
 
-#[poise::command(slash_command, prefix_command, ephemeral = true)]
+#[poise::command(slash_command, prefix_command, ephemeral = true, guild_only)]
 pub async fn id(
     ctx: Context<'_>,
     #[description = "Your KTH ID"] kth_id: String,
@@ -173,14 +173,21 @@ pub async fn id(
     prefix_command,
     slash_command,
     subcommands("open", "close", "check"),
-    check = "check_admin"
+    check = "check_admin",
+    guild_only
 )]
 pub async fn passreg(ctx: Context<'_>) -> Result<(), Error> {
     ctx.say("Invalid use of parent command.").await?;
     Ok(())
 }
 
-#[poise::command(slash_command, prefix_command, check = "check_admin", ephemeral = true)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    check = "check_admin",
+    ephemeral = true,
+    guild_only
+)]
 pub async fn open(
     ctx: Context<'_>,
     #[description = "The passphrase to use for authentication"] phrase: String,
@@ -199,7 +206,13 @@ pub async fn open(
     Ok(())
 }
 
-#[poise::command(slash_command, prefix_command, check = "check_admin", ephemeral = true)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    check = "check_admin",
+    ephemeral = true,
+    guild_only
+)]
 pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
     // Don't use `if let` to avoid holding lock across the `await` below.
     let existing = ctx.data().open_reg_phrase.lock().unwrap().clone();
@@ -214,7 +227,13 @@ pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-#[poise::command(slash_command, prefix_command, check = "check_admin", ephemeral = true)]
+#[poise::command(
+    slash_command,
+    prefix_command,
+    check = "check_admin",
+    ephemeral = true,
+    guild_only
+)]
 pub async fn check(ctx: Context<'_>) -> Result<(), Error> {
     // Don't use `if let` to avoid holding lock across the `await` below.
     let existing = ctx.data().open_reg_phrase.lock().unwrap().clone();
