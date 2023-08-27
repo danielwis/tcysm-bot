@@ -1,5 +1,6 @@
 use crate::checks::check_admin;
 use crate::{Context, Error};
+use poise::serenity_prelude as serenity;
 use reqwest;
 use scraper::{Html, Selector};
 use serde::Deserialize;
@@ -49,54 +50,71 @@ pub async fn passphrase(
     ctx: Context<'_>,
     #[description = "The passphrase"] passphrase: String,
 ) -> Result<(), Error> {
-    let existing_phrase = ctx.data().open_reg_phrase.lock().unwrap().clone();
+    let db = &ctx.data().database;
+    let mut transaction = db.begin().await?;
+
+    let matching_roles: Vec<serenity::RoleId> = sqlx::query!(
+        "SELECT role FROM linked_roles WHERE passphrase = ?;",
+        passphrase
+    )
+    .fetch_all(&mut *transaction)
+    .await?
+    .iter()
+    .filter_map(|row| row.role.parse::<serenity::RoleId>().ok())
+    .collect();
+
+    if matching_roles.len() == 0 {
+        ctx.say("This phrase does not currently seem to be linked to any roles. Please try again.")
+            .await?;
+        return Ok(());
+    }
+
     let author_id = ctx.author().id.0 as i64;
 
-    if let Some(phrase) = existing_phrase {
-        if phrase == passphrase {
-            // Users who are already authenticated don't need to re-auth
-            if let Some(auth_status) =
-                sqlx::query!("SELECT status FROM auths WHERE user_id = ?", author_id)
-                    .fetch_optional(&ctx.data().database)
-                    .await?
-            {
-                if auth_status.status == "authenticated" {
-                    ctx.say("Already authenticated.").await?;
-                    return Ok(());
-                }
-            }
+    let now = std::time::SystemTime::now();
+    let db_time = humantime::format_rfc3339_seconds(now).to_string();
+    let mut num_roles_added = 0;
+    for role in &matching_roles {
+        // Add auth to DB
+        let db_role = role.0.to_string();
+        let num_affected = sqlx::query!(
+        "INSERT OR IGNORE INTO auths(user_id, role, status, passphrase, auth_type, kth_id, authenticated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?);",
+        author_id,
+        db_role,
+        "authenticated",
+        passphrase,
+        "passphrase",
+        None::<String>,
+        db_time
+    )
+        .execute(&mut *transaction)
+        .await?.rows_affected();
 
-            // Add auth to DB
-            let now = std::time::SystemTime::now();
-            let db_time = humantime::format_rfc3339_seconds(now).to_string();
-            sqlx::query!(
-                "INSERT INTO auths(user_id, role, status, passphrase, auth_type, kth_id, authenticated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?);",
-                author_id,
-                "student",
-                "authenticated",
-                passphrase,
-                "passphrase",
-                None::<String>,
-                db_time
-            )
-            .execute(&ctx.data().database)
+        // TODO Just do num_roles_added += num_affected?
+        match num_affected {
+            0 => continue,
+            1 => num_roles_added += 1,
+            _ => unreachable!("Should only insert one row. Affected {num_affected}."),
+        };
+
+        // Add role to user
+        ctx.author_member()
+            .await
+            .unwrap()
+            .to_mut()
+            .add_role(&ctx.serenity_context().http, role)
             .await?;
-
-            ctx.author_member()
-                .await
-                .unwrap()
-                .to_mut()
-                .add_role(&ctx.serenity_context().http, ctx.data().student_role_id)
-                .await?;
-
-            ctx.say("Successfully authenticated as student.").await?;
-        } else {
-            ctx.say("Incorrect passphrase. Please try again.").await?;
-        }
-    } else {
-        ctx.say("Passphrase authentication is not currently enabled. If you believe this to be a mistake, please contact a moderator.").await?;
     }
+
+    transaction.commit().await?;
+
+    ctx.say(if num_roles_added > 0 {
+        format!("Authentication successful. Added {num_roles_added} roles")
+    } else {
+        format!("Already authenticated for all roles linked to passphrase {passphrase}")
+    })
+    .await?;
 
     Ok(())
 }
@@ -172,7 +190,7 @@ pub async fn id(
 #[poise::command(
     prefix_command,
     slash_command,
-    subcommands("open", "close", "check"),
+    subcommands("link_role", "unlink_role", "list_phrases", "list_roles"),
     check = "check_admin",
     guild_only
 )]
@@ -188,20 +206,83 @@ pub async fn passreg(ctx: Context<'_>) -> Result<(), Error> {
     ephemeral = true,
     guild_only
 )]
-pub async fn open(
+pub async fn link_role(
     ctx: Context<'_>,
-    #[description = "The passphrase to use for authentication"] phrase: String,
+    #[description = "A passphrase"] phrase: String,
+    #[description = "The role to link to the passphrase"] role: serenity::Role,
 ) -> Result<(), Error> {
-    // Don't use `if let` to avoid holding lock across the `await` below.
-    let existing = ctx.data().open_reg_phrase.lock().unwrap().clone();
-    if let Some(existing_phrase) = existing {
-        ctx.say(format!("Registration already open with phrase {existing_phrase}. Close and re-open to change the phrase."))
-            .await?;
+    // Add the binding to the database
+    let db_role = role.id.0 as i64;
+    sqlx::query!(
+        "INSERT INTO linked_roles(passphrase, role) VALUES (?, ?);",
+        phrase,
+        db_role
+    )
+    .execute(&ctx.data().database)
+    .await?;
+
+    let role_name = role.name;
+    ctx.say(format!(
+        "Associated role {role_name} with passphrase {phrase}."
+    ))
+    .await?;
+    Ok(())
+}
+
+#[poise::command(
+    slash_command,
+    prefix_command,
+    check = "check_admin",
+    ephemeral = true,
+    guild_only
+)]
+pub async fn unlink_role(
+    ctx: Context<'_>,
+    #[description = "A passphrase"] phrase: String,
+    #[description = "The role to unlink from the passphrase"] role: serenity::Role,
+) -> Result<(), Error> {
+    // Remove the binding from the database
+    let db_role = role.id.0 as i64;
+    let num_deleted = sqlx::query!(
+        "DELETE FROM linked_roles WHERE passphrase = ? AND role = ?;",
+        phrase,
+        db_role
+    )
+    .execute(&ctx.data().database)
+    .await?
+    .rows_affected();
+
+    let role_name = role.name;
+    ctx.say(if num_deleted > 0 {
+        format!("Role '{role_name}' no longer associated with passphrase '{phrase}'.")
     } else {
-        *ctx.data().open_reg_phrase.lock().unwrap() = Some(phrase.clone());
-        ctx.say(format!("Passphrase registration opened with '{phrase}'"))
-            .await?;
-    }
+        format!("Role '{role_name}' not associated with phrase '{phrase}' (deleted {num_deleted} records).")
+    })
+    .await?;
+    Ok(())
+}
+
+#[poise::command(
+    slash_command,
+    prefix_command,
+    check = "check_admin",
+    ephemeral = true,
+    guild_only
+)]
+pub async fn list_phrases(ctx: Context<'_>) -> Result<(), Error> {
+    let phrases: Vec<String> = sqlx::query!("SELECT DISTINCT(passphrase) FROM linked_roles;")
+        .fetch_all(&ctx.data().database)
+        .await?
+        .into_iter()
+        .map(|res| res.passphrase)
+        .collect();
+
+    ctx.say(if phrases.len() > 0 {
+        phrases.join(", ")
+    } else {
+        String::from("No phrases currently in use.")
+    })
+    .await?;
 
     Ok(())
 }
@@ -213,36 +294,37 @@ pub async fn open(
     ephemeral = true,
     guild_only
 )]
-pub async fn close(ctx: Context<'_>) -> Result<(), Error> {
-    // Don't use `if let` to avoid holding lock across the `await` below.
-    let existing = ctx.data().open_reg_phrase.lock().unwrap().clone();
-    if let Some(existing_phrase) = existing {
-        ctx.say(format!(
-            "Closing open registration with '{existing_phrase}'."
-        ))
-        .await?;
-    }
-    *ctx.data().open_reg_phrase.lock().unwrap() = None;
+pub async fn list_roles(
+    ctx: Context<'_>,
+    #[description = "The passphrase for which to see the linked roles"] phrase: String,
+) -> Result<(), Error> {
+    let guild = ctx.guild().unwrap();
 
-    Ok(())
-}
+    let role_ids: Vec<serenity::RoleId> = sqlx::query!(
+        "SELECT role FROM linked_roles WHERE passphrase = ?;",
+        phrase
+    )
+    .fetch_all(&ctx.data().database)
+    .await?
+    .iter()
+    .filter_map(|row| row.role.parse::<serenity::RoleId>().ok())
+    .collect();
 
-#[poise::command(
-    slash_command,
-    prefix_command,
-    check = "check_admin",
-    ephemeral = true,
-    guild_only
-)]
-pub async fn check(ctx: Context<'_>) -> Result<(), Error> {
-    // Don't use `if let` to avoid holding lock across the `await` below.
-    let existing = ctx.data().open_reg_phrase.lock().unwrap().clone();
-    if let Some(existing_phrase) = existing {
-        ctx.say(format!("Registration open. Phrase: '{existing_phrase}'."))
-            .await?;
+    let roles: Vec<&serenity::Role> = role_ids
+        .iter()
+        .filter_map(|id| guild.roles.get(&id))
+        .collect();
+
+    let role_names = roles
+        .iter()
+        .map(|r| r.name.clone())
+        .collect::<Vec<String>>();
+
+    ctx.say(if role_names.len() > 0 {
+        role_names.join(", ")
     } else {
-        ctx.say("Closed.").await?;
-    }
-
+        format!("No roles currently associated with phrase '{phrase}'.")
+    })
+    .await?;
     Ok(())
 }

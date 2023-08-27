@@ -1,6 +1,6 @@
 {
   "db": "SQLite",
-  "218110bdee315a13245ffd3314c808a33086171c4f9d457978041274ad5f0921": {
+  "06720e763ca119f8273e1a88b314e8debe9c5d5a54bf5082ce0c15db02596b24": {
     "describe": {
       "columns": [],
       "nullable": [],
@@ -8,7 +8,25 @@
         "Right": 7
       }
     },
-    "query": "INSERT INTO auths(user_id, role, status, passphrase, auth_type, kth_id, authenticated_at)\n                VALUES (?, ?, ?, ?, ?, ?, ?);"
+    "query": "INSERT INTO auths(user_id, role, status, passphrase, auth_type, kth_id, authenticated_at)\n        VALUES (?, ?, ?, ?, ?, ?, ?);"
+  },
+  "0beeaa5ccd2846df5f8a3c5d8fc23286f3b51ec75df2c96c639c6d17f286fe08": {
+    "describe": {
+      "columns": [
+        {
+          "name": "passphrase",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "SELECT DISTINCT(passphrase) FROM linked_roles;"
   },
   "2951830c91334a34f64891bf16e35f2d998334eb80d953683abe20e94317601d": {
     "describe": {
@@ -19,6 +37,16 @@
       }
     },
     "query": "INSERT INTO auths(user_id, role, status, passphrase, auth_type, kth_id)\n            VALUES (?, ?, ?, ?, ?, ?);"
+  },
+  "389c875490db9f27967e3fc0caf3c71a77f86749d9534e5df234795e6024c62b": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 2
+      }
+    },
+    "query": "INSERT INTO linked_roles(passphrase, role) VALUES (?, ?);"
   },
   "7ab4c0e748772211a252e85cafda1fe0b1eb778b54e48e4339ed0cd7c5ad4399": {
     "describe": {
@@ -37,5 +65,33 @@
       }
     },
     "query": "SELECT status FROM auths WHERE user_id = ?"
+  },
+  "94ebfd34222f3d7c910f8298d266f82bebbefd122806eeda7714f39513af136d": {
+    "describe": {
+      "columns": [
+        {
+          "name": "role",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "SELECT role FROM linked_roles WHERE passphrase = ?;"
+  },
+  "d6af9e496f28ef4d4ddef22c0d32da2cdbb95e74aa7a8f8c69e05f84459495fc": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 2
+      }
+    },
+    "query": "DELETE FROM linked_roles WHERE passphrase = ? AND role = ?;"
   }
 }

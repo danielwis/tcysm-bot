@@ -1,14 +1,11 @@
 mod auth;
 mod checks;
 mod meta;
-use std::sync::Mutex;
 
 use poise::serenity_prelude as serenity;
 pub struct Data {
     database: sqlx::SqlitePool,
-    admin_role_id: serenity::RoleId,
-    student_role_id: serenity::RoleId,
-    open_reg_phrase: Mutex<Option<String>>,
+    admin_role_id: serenity::RoleId
 }
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -33,10 +30,6 @@ async fn main() {
         .expect("Unable to find admin role ID in environment variables")
         .parse::<serenity::RoleId>()
         .unwrap();
-    let student_role_id = std::env::var("STUDENT_ROLE_ID")
-        .expect("Unable to find student role ID in environment variables")
-        .parse::<serenity::RoleId>()
-        .unwrap();
 
     poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -59,7 +52,8 @@ async fn main() {
         .intents(
             serenity::GatewayIntents::GUILD_MESSAGES
                 | serenity::GatewayIntents::DIRECT_MESSAGES
-                | serenity::GatewayIntents::MESSAGE_CONTENT,
+                | serenity::GatewayIntents::MESSAGE_CONTENT
+                | serenity::GatewayIntents::GUILDS,
         )
         .setup(move |ctx, ready, framework| {
             Box::pin(async move {
@@ -67,9 +61,7 @@ async fn main() {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 Ok(Data {
                     database,
-                    admin_role_id,
-                    student_role_id,
-                    open_reg_phrase: Mutex::new(None),
+                    admin_role_id
                 })
             })
         })
