@@ -73,11 +73,10 @@ pub async fn passphrase(
 
     let now = std::time::SystemTime::now();
     let db_time = humantime::format_rfc3339_seconds(now).to_string();
-    let mut num_roles_added = 0;
     for role in &matching_roles {
         // Add auth to DB
         let db_role = role.0.to_string();
-        let num_affected = sqlx::query!(
+        sqlx::query!(
         "INSERT OR IGNORE INTO auths(user_id, role, status, passphrase, auth_type, kth_id, authenticated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?);",
         author_id,
@@ -91,13 +90,6 @@ pub async fn passphrase(
         .execute(&mut *transaction)
         .await?.rows_affected();
 
-        // TODO Just do num_roles_added += num_affected?
-        match num_affected {
-            0 => continue,
-            1 => num_roles_added += 1,
-            _ => unreachable!("Should only insert one row. Affected {num_affected}."),
-        };
-
         // Add role to user
         ctx.author_member()
             .await
@@ -109,12 +101,7 @@ pub async fn passphrase(
 
     transaction.commit().await?;
 
-    ctx.say(if num_roles_added > 0 {
-        format!("Authentication successful. Added {num_roles_added} roles")
-    } else {
-        format!("Already authenticated for all roles linked to passphrase {passphrase}")
-    })
-    .await?;
+    ctx.say("Authentication successful. If you were missing any roles linked to the passphrase, these have now been given to you.").await?;
 
     Ok(())
 }
