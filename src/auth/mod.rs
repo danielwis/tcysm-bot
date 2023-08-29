@@ -106,11 +106,18 @@ pub async fn passphrase(
     Ok(())
 }
 
+// TODO remove once this function is enabled.
+#[allow(unreachable_code)]
+#[allow(unused_variables)]
 #[poise::command(slash_command, prefix_command, ephemeral = true, guild_only)]
 pub async fn id(
     ctx: Context<'_>,
     #[description = "Your KTH ID"] kth_id: String,
 ) -> Result<(), Error> {
+    ctx.say("ID authentication is currently in development. Please use the `/authenticate passphrase` command instead.").await?;
+    return Ok(());
+
+    // TODO
     let author_id = ctx.author().id.0 as i64;
     if let Some(auth_status) = sqlx::query!("SELECT status FROM auths WHERE user_id = ?", author_id)
         .fetch_optional(&ctx.data().database)
