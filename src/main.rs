@@ -16,10 +16,12 @@ async fn main() {
 
     let db_url = std::env::var("DATABASE_URL").unwrap();
     let database = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
         .connect_with(
             db_url
                 .parse::<sqlx::sqlite::SqliteConnectOptions>()
                 .unwrap()
+                .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
                 .create_if_missing(true),
         )
         .await
