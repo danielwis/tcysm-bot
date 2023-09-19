@@ -15,3 +15,5 @@ serde = "1.0.177"
 tokio = { version = "1.4.0", features = ["rt-multi-thread", "process"] }
 sqlx = { version = "0.6", features = ["runtime-tokio-rustls", "sqlite", "offline"] }
 humantime = "2.1.0"
+rand = "0.8.5"
+lettre = "0.10.4"

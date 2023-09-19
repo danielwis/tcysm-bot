@@ -18,15 +18,25 @@
     },
     "query": "SELECT DISTINCT(passphrase) FROM linked_roles;"
   },
-  "2951830c91334a34f64891bf16e35f2d998334eb80d953683abe20e94317601d": {
+  "0d27234191a54529b293fe878dfc30cbb06a3a765446e6e5d3ddfc7c94c15ba4": {
     "describe": {
       "columns": [],
       "nullable": [],
       "parameters": {
-        "Right": 6
+        "Right": 3
       }
     },
-    "query": "INSERT INTO auths(user_id, role, status, passphrase, auth_type, kth_id)\n            VALUES (?, ?, ?, ?, ?, ?);"
+    "query": "INSERT INTO pending_auths(discord_id, kth_id, verification_code)\n            VALUES (?, ?, ?);"
+  },
+  "2f0aa7c53341a93da4bc45ba5d4d52f4c260c6dbc88bb7ccedfa858c84d840a8": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 3
+      }
+    },
+    "query": "INSERT INTO authenticated(discord_id, kth_id, timestamp) VALUES (?, ?, ?);"
   },
   "389c875490db9f27967e3fc0caf3c71a77f86749d9534e5df234795e6024c62b": {
     "describe": {
@@ -37,24 +47,6 @@
       }
     },
     "query": "INSERT INTO linked_roles(passphrase, role) VALUES (?, ?);"
-  },
-  "7ab4c0e748772211a252e85cafda1fe0b1eb778b54e48e4339ed0cd7c5ad4399": {
-    "describe": {
-      "columns": [
-        {
-          "name": "status",
-          "ordinal": 0,
-          "type_info": "Text"
-        }
-      ],
-      "nullable": [
-        false
-      ],
-      "parameters": {
-        "Right": 1
-      }
-    },
-    "query": "SELECT status FROM auths WHERE user_id = ?"
   },
   "94ebfd34222f3d7c910f8298d266f82bebbefd122806eeda7714f39513af136d": {
     "describe": {
@@ -84,14 +76,22 @@
     },
     "query": "DELETE FROM linked_roles WHERE passphrase = ? AND role = ?;"
   },
-  "efbe6a9a0e55d8d16fa7331108bfb1a3673b83526c0a6b12eed15d2e243ef5db": {
+  "fdda42ea94463c13f1459db0f5c7eea0ea6239be20c7dc3ecde9954a286cbf8b": {
     "describe": {
-      "columns": [],
-      "nullable": [],
+      "columns": [
+        {
+          "name": "kth_id",
+          "ordinal": 0,
+          "type_info": "Text"
+        }
+      ],
+      "nullable": [
+        false
+      ],
       "parameters": {
-        "Right": 7
+        "Right": 2
       }
     },
-    "query": "INSERT OR IGNORE INTO auths(user_id, role, status, passphrase, auth_type, kth_id, authenticated_at)\n        VALUES (?, ?, ?, ?, ?, ?, ?);"
+    "query": "SELECT kth_id FROM pending_auths WHERE discord_id = ? AND verification_code = ?;"
   }
 }

@@ -2,10 +2,12 @@ mod auth;
 mod checks;
 mod meta;
 
+use lettre::{transport::smtp::authentication::Credentials, SmtpTransport};
 use poise::serenity_prelude as serenity;
 pub struct Data {
     database: sqlx::SqlitePool,
-    admin_role_id: serenity::RoleId
+    mailer: SmtpTransport,
+    admin_role_id: serenity::RoleId,
 }
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -14,6 +16,21 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 async fn main() {
     dotenv::dotenv().expect("Failed to find .env file in current directory.");
 
+    // Setup email
+    let smtp_username =
+        std::env::var("SMTP_USER").expect("Missing SMTP username in environment variables");
+    let smtp_password =
+        std::env::var("SMTP_PASS").expect("Missing SMTP password in environment variables");
+    let smtp_server =
+        std::env::var("SMTP_SERVER").expect("Missing SMTP server address in environment variables");
+
+    let creds = Credentials::new(smtp_username, smtp_password);
+    let mailer = SmtpTransport::starttls_relay(&smtp_server)
+        .unwrap()
+        .credentials(creds)
+        .build();
+
+    // Setup local database
     let db_url = std::env::var("DATABASE_URL").unwrap();
     let database = sqlx::sqlite::SqlitePoolOptions::new()
         .max_connections(1)
@@ -63,7 +80,8 @@ async fn main() {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
                 Ok(Data {
                     database,
-                    admin_role_id
+                    mailer,
+                    admin_role_id,
                 })
             })
         })
