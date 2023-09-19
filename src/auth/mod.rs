@@ -170,7 +170,7 @@ pub async fn begin(
 
     // Add to pending_auths
     sqlx::query!(
-        "INSERT INTO pending_auths(discord_id, kth_id, verification_code)
+        "INSERT OR REPLACE INTO pending_auths(discord_id, kth_id, verification_code)
             VALUES (?, ?, ?);",
         author_id,
         kth_id,
@@ -224,7 +224,7 @@ pub async fn verify(
     let db = &ctx.data().database;
     let mut transaction = db.begin().await?;
     sqlx::query!(
-        "INSERT INTO authenticated(discord_id, kth_id, timestamp) VALUES (?, ?, ?);",
+        "INSERT OR REPLACE INTO authenticated(discord_id, kth_id, timestamp) VALUES (?, ?, ?);",
         author_id,
         kth_id,
         db_time
