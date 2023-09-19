@@ -70,7 +70,10 @@ async fn send_authentication_email(
     user: KTHUser,
     auth_code: &str,
 ) -> Result<(), Error> {
-    let message = format!("Hello, this is your code: {auth_code}");
+    let message = format!(
+        "We're glad to have you joining us in the TCYSM Discord server.\n\
+        Your personal authentication code is '{auth_code}' (without the single quotes)."
+    );
     let email = Message::builder()
         .from("Daniel Williams<dwilli@kth.se>".parse()?)
         // TODO: Get user name too, so that it can be entered in the same format
@@ -218,14 +221,32 @@ pub async fn verify(
         .await?;
 
     // Insert the authentication into the DB to keep track of users -> KTH ID
+    let db = &ctx.data().database;
+    let mut transaction = db.begin().await?;
     sqlx::query!(
         "INSERT INTO authenticated(discord_id, kth_id, timestamp) VALUES (?, ?, ?);",
         author_id,
         kth_id,
         db_time
     )
-    .execute(&ctx.data().database)
+    .execute(&mut transaction)
     .await?;
+    // Also delete the row from the pending table as the code's been used.
+    sqlx::query!("DELETE FROM pending_auths WHERE discord_id = ?;", author_id)
+        .execute(&mut transaction)
+        .await?;
+    transaction.commit().await?;
+
+    let granted_role = ctx
+        .guild()
+        .unwrap()
+        .roles
+        .get(&role_to_grant)
+        .unwrap()
+        .name
+        .clone();
+    ctx.say(format!("Verified as {granted_role}. Welcome!"))
+        .await?;
 
     Ok(())
 }

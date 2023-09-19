@@ -66,6 +66,16 @@
     },
     "query": "SELECT role FROM linked_roles WHERE passphrase = ?;"
   },
+  "a35866a0d696bb75d2c76edf0b0070943bfe9a457d9dd25a94d8026ce05f4d6f": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 1
+      }
+    },
+    "query": "DELETE FROM pending_auths WHERE discord_id = ?;"
+  },
   "d6af9e496f28ef4d4ddef22c0d32da2cdbb95e74aa7a8f8c69e05f84459495fc": {
     "describe": {
       "columns": [],
