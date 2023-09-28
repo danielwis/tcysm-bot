@@ -146,7 +146,6 @@ pub async fn id(ctx: Context<'_>) -> Result<(), Error> {
     prefix_command,
     ephemeral = true,
     guild_only,
-    check = "check_admin"
 )]
 pub async fn begin(
     ctx: Context<'_>,
