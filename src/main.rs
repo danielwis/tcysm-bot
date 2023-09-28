@@ -1,5 +1,6 @@
 mod auth;
 mod checks;
+mod helpers;
 mod meta;
 
 use lettre::{transport::smtp::authentication::Credentials, SmtpTransport};
@@ -8,6 +9,7 @@ pub struct Data {
     database: sqlx::SqlitePool,
     mailer: SmtpTransport,
     admin_role_id: serenity::RoleId,
+    modlog_channel_id: serenity::ChannelId,
 }
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
@@ -45,9 +47,15 @@ async fn main() {
         .unwrap();
     sqlx::migrate!("./migrations").run(&database).await.unwrap();
 
+    // Setup server/guild related variables
     let admin_role_id = std::env::var("ADMIN_ROLE_ID")
         .expect("Unable to find admin role ID in environment variables")
         .parse::<serenity::RoleId>()
+        .unwrap();
+
+    let modlog_channel_id = std::env::var("MODLOG_CHANNEL_ID")
+        .expect("Unable to find modlog channel ID in environment variables")
+        .parse::<serenity::ChannelId>()
         .unwrap();
 
     poise::Framework::builder()
@@ -55,6 +63,7 @@ async fn main() {
             commands: vec![
                 meta::source(),
                 meta::register(),
+                meta::test_modlog(),
                 auth::authenticate(),
                 auth::passreg(),
             ],
@@ -82,6 +91,7 @@ async fn main() {
                     database,
                     mailer,
                     admin_role_id,
+                    modlog_channel_id
                 })
             })
         })

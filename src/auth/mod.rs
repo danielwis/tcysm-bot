@@ -1,4 +1,5 @@
 use crate::checks::check_admin;
+use crate::helpers::post_to_modlog;
 use crate::{Context, Error};
 use lettre::Transport;
 use lettre::{message::header::ContentType, Message};
@@ -67,7 +68,7 @@ async fn decide_role_to_grant(kth_id: &str, ctx: Context<'_>) -> Result<serenity
 
 async fn send_authentication_email(
     ctx: Context<'_>,
-    user: KTHUser,
+    user: &KTHUser,
     auth_code: &str,
 ) -> Result<(), Error> {
     let message = format!(
@@ -183,9 +184,17 @@ pub async fn begin(
     // Do this after adding to DB just in case smth crashes between these two points,
     // as we don't want to send an e-mail with a code that doesn't work.
     ctx.say(
-        match send_authentication_email(ctx, student.unwrap(), &secret_code).await {
+        match send_authentication_email(ctx, student.as_ref().unwrap(), &secret_code).await {
             Ok(_) => "Authentication e-mail sent, please check your inbox.",
-            Err(_) => "Failed to send e-mail. A message containing the error has been sent to the mods for investigation.",
+            Err(why) => {
+                post_to_modlog(
+                    ctx,
+                    format!("Error sending authentication e-mail to {}: {}",
+                        student.unwrap().email, why.to_string()).as_str()
+                ).await?;
+                
+                "Failed to send e-mail. A message containing the error has been sent to the mods for investigation."
+            }
         },
     ).await?;
 
